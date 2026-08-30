@@ -1,5 +1,4 @@
-# AsmJit
-# ======
+cmake_minimum_required(VERSION 3.15)
 
 # AsmJit library provides a single alias that can use used to consume it as a dependency:
 #
