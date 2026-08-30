@@ -384,6 +384,88 @@ endfunction()
 # AsmJit - Compiler Support
 # =========================
 
+set(ASMJIT_INCLUDE_DIRS "${ASMJIT_DIR}/src")     # Include directory is the same as source dir.
+set(ASMJIT_DEPS "")                              # AsmJit dependencies (libraries) for the linker.
+set(ASMJIT_LIBS "")                              # Dependencies of libs/apps that want to use AsmJit.
+set(ASMJIT_CFLAGS "")                            # Public compiler flags.
+set(ASMJIT_PRIVATE_CFLAGS "")                    # Private compiler flags independent of build type.
+set(ASMJIT_PRIVATE_CFLAGS_DBG "")                # Private compiler flags used by debug builds.
+set(ASMJIT_PRIVATE_CFLAGS_REL "")                # Private compiler flags used by release builds.
+set(ASMJIT_SANITIZE_CFLAGS "")                   # Compiler flags required by currently enabled sanitizers.
+set(ASMJIT_SANITIZE_LFLAGS "")                   # Linker flags required by currently enabled sanitizers.
+
+# We will have to keep this most likely forever as some users may still be using it.
+set(ASMJIT_INCLUDE_DIR "${ASMJIT_INCLUDE_DIRS}")
+
+if (NOT ASMJIT_NO_CUSTOM_FLAGS)
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC" OR "x${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "xMSVC")
+    list(APPEND ASMJIT_PRIVATE_CFLAGS
+      -MP                      # [+] Multi-Process Compilation.
+      -GF                      # [+] Eliminate duplicate strings.
+      -Zc:__cplusplus          # [+] Conforming __cplusplus definition.
+      -Zc:inline               # [+] Remove unreferenced COMDAT.
+      -Zc:strictStrings        # [+] Strict const qualification of string literals.
+      -Zc:threadSafeInit-      # [-] Thread-safe statics.
+      -W4)                     # [+] Warning level 4.
+
+    list(APPEND ASMJIT_PRIVATE_CFLAGS_DBG
+      -GS)                     # [+] Buffer security-check.
+
+    list(APPEND ASMJIT_PRIVATE_CFLAGS_REL
+      -GS-                     # [-] Buffer security-check.
+      -O2                      # [+] Favor speed over size.
+      -Oi)                     # [+] Generate intrinsic functions.
+  elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^(GNU|Clang|AppleClang)$")
+    list(APPEND ASMJIT_PRIVATE_CFLAGS -Wall -Wextra -Wconversion)
+    list(APPEND ASMJIT_PRIVATE_CFLAGS -fno-math-errno)
+    list(APPEND ASMJIT_PRIVATE_CFLAGS_REL -O2)
+
+    asmjit_detect_cflags(ASMJIT_PRIVATE_CFLAGS
+        -fno-threadsafe-statics)
+
+    if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+      asmjit_detect_cflags(ASMJIT_PRIVATE_CFLAGS
+        -fno-semantic-interposition)
+    endif()
+
+    # The following flags can save few bytes in the resulting binary.
+    asmjit_detect_cflags(ASMJIT_PRIVATE_CFLAGS_REL
+      -fmerge-all-constants    # Merge all constants even if it violates ISO C++.
+      -fno-enforce-eh-specs)   # Don't enforce termination if noexcept function throws.
+  endif()
+endif()
+
+# Support for sanitizers.
+if (ASMJIT_SANITIZE)
+  ASMJIT_detect_sanitizers(ASMJIT_SANITIZE_CFLAGS ${ASMJIT_SANITIZE})
+  if (ASMJIT_SANITIZE_CFLAGS)
+    message("-- Enabling sanitizers: '${ASMJIT_SANITIZE_CFLAGS}'")
+
+    # Linker must receive the same flags as the compiler when it comes to sanitizers.
+    set(ASMJIT_SANITIZE_LFLAGS ${ASMJIT_SANITIZE_CFLAGS})
+
+    # Don't omit frame pointer if sanitizers are enabled.
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC" OR "x${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "xMSVC")
+      list(APPEND ASMJIT_SANITIZE_CFLAGS -Oy-)
+    else()
+      list(APPEND ASMJIT_SANITIZE_CFLAGS -fno-omit-frame-pointer -g)
+    endif()
+
+    list(APPEND ASMJIT_PRIVATE_CFLAGS ${ASMJIT_SANITIZE_CFLAGS})
+    list(APPEND ASMJIT_PRIVATE_LFLAGS ${ASMJIT_SANITIZE_LFLAGS})
+  endif()
+endif()
+
+# Do not link to pthread on Android as it's part of C runtime.
+if (NOT WIN32 AND NOT ANDROID)
+  list(APPEND ASMJIT_DEPS pthread)
+endif()
+
+if ("${CMAKE_SYSTEM_NAME}" MATCHES "Linux" OR "${CMAKE_SYSTEM_NAME}" MATCHES "NetBSD")
+  list(APPEND ASMJIT_DEPS rt)
+endif()
+
+set(ASMJIT_LIBS ${ASMJIT_DEPS})
 if (NOT ASMJIT_EMBED)
   if (NOT ASMJIT_NO_CUSTOM_FLAGS)
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC" OR "x${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "xMSVC")
