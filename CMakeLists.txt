@@ -384,7 +384,6 @@ endfunction()
 # AsmJit - Compiler Support
 # =========================
 
-set(ASMJIT_INCLUDE_DIRS "${ASMJIT_DIR}/src")     # Include directory is the same as source dir.
 set(ASMJIT_DEPS "")                              # AsmJit dependencies (libraries) for the linker.
 set(ASMJIT_LIBS "")                              # Dependencies of libs/apps that want to use AsmJit.
 set(ASMJIT_CFLAGS "")                            # Public compiler flags.
