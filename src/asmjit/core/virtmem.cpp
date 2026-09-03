@@ -258,7 +258,7 @@ static void getVMInfo(Info& vmInfo) noexcept {
   vmInfo.pageGranularity = Support::max<uint32_t>(pageSize, 65536);
 }
 
-#if defined(__APPLE__) && TARGET_OS_OSX
+#if defined(__APPLE__) && TARGET_OS_OSX && ASMJIT_ARCH_ARM < 64
 static int getOSXVersion() noexcept {
   // MAP_JIT flag required to run unsigned JIT code is only supported by kernel version 10.14+ (Mojave).
   static std::atomic<int> globalVersion;
@@ -273,7 +273,7 @@ static int getOSXVersion() noexcept {
 
   return ver;
 }
-#endif // __APPLE__ && TARGET_OS_OSX
+#endif // __APPLE__ && TARGET_OS_OSX && ASMJIT_ARCH_ARM < 64
 
 // Returns `mmap()` protection flags from \ref MemoryFlags.
 static int mmProtFromMemoryFlags(MemoryFlags memoryFlags) noexcept {
@@ -804,7 +804,9 @@ HardenedRuntimeInfo hardenedRuntimeInfo() noexcept {
 
 void protectJitMemory(ProtectJitAccess access) noexcept {
 #if defined(ASMJIT_HAS_PTHREAD_JIT_WRITE_PROTECT_NP)
-  pthread_jit_write_protect_np(static_cast<int>(access));
+  if (__builtin_available(macOS 11.0, *)) {
+    pthread_jit_write_protect_np(static_cast<int>(access));
+  }
 #else
   DebugUtils::unused(access);
 #endif
